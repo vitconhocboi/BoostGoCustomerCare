@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">CustomerCare</string>
+    <string name="hint_phone_number">Enter phone number (e.g., +1234567890)</string>
+    <string name="phone_number">Phone Number</string>
+    <string name="send_sms">Send SMS</string>
+    <string name="message">Message</string>
+    <string name="enter_your_message_here">Enter your message here...</string>
+    <string name="valid_sms_length">0/160 characters</string>
+    <string name="quick_actions">Quick Actions</string>
+    <string name="sample_number">Sample Number</string>
+    <string name="sample_message">Sample Message</string>
+    <string name="customer_care_app">Customer Care App</string>
+    <string name="open_sms_screen">Open SMS Screen</string>
+    <string name="stop_service">Stop Service</string>
+    <string name="start_service">Start Service</string>
+    <string name="clear_all">Clear All</string>
+    <string name="sms_messages">SMS Messages</string>
+    <string name="no_messages_yet">No messages yet</string>
+    <string name="send_your_first_sms_to_see_it_here">Send your first SMS to see it here</string>
+</resources>
