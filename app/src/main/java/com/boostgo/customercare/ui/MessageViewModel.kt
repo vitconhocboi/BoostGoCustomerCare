@@ -22,12 +22,9 @@ class MessageViewModel @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::cla
     val deliveredMessages: LiveData<List<SmsMessage>> = _deliveredMessages
 
     private var currentFilter: String? = null
+    private var currentPhoneFilter: String? = null
 
-    fun init() {
-        loadDeliveredMessages()
-    }
-
-    private fun loadDeliveredMessages() {
+    public fun loadDeliveredMessages() {
         viewModelScope.launch {
             smsMessageRepo.getAllMessages().collect { messages ->
                 _allMessages.value = messages
@@ -38,11 +35,20 @@ class MessageViewModel @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::cla
 
     private fun applyFilter() {
         val allMessages = _allMessages.value ?: emptyList()
-        val filteredMessages = if (currentFilter == null || currentFilter == "All") {
-            allMessages
-        } else {
-            allMessages.filter { it.status == currentFilter }
+        var filteredMessages = allMessages
+        
+        // Apply status filter
+        if (currentFilter != null && currentFilter != "All") {
+            filteredMessages = filteredMessages.filter { it.status == currentFilter }
         }
+        
+        // Apply phone number filter
+        if (!currentPhoneFilter.isNullOrBlank()) {
+            filteredMessages = filteredMessages.filter { 
+                it.phoneNumber.startsWith(currentPhoneFilter!!, ignoreCase = true) 
+            }
+        }
+        
         _deliveredMessages.value = filteredMessages
     }
 
@@ -59,6 +65,12 @@ class MessageViewModel @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::cla
 
     fun clearFilter() {
         currentFilter = null
+        currentPhoneFilter = null
+        applyFilter()
+    }
+    
+    fun filterByPhoneNumber(phoneNumber: String?) {
+        currentPhoneFilter = phoneNumber?.trim()?.takeIf { it.isNotBlank() }
         applyFilter()
     }
 

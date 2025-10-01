@@ -228,7 +228,7 @@ class SmsService : Service() {
             storeMessage(phoneNumber, message, "Sending")
 
             // Update order status to "sent"
-            updateOrderStatus(orderId, "sent")
+            updateOrderStatus(orderId, "3")
 
             Log.i("SmsService", "SMS sent to $phoneNumber")
 

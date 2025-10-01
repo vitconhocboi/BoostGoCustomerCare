@@ -69,9 +69,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
+                android:layout_gravity="center"
                 android:layout_marginTop="16dp"
                 android:background="@drawable/filter_background"
                 android:padding="12dp">
+
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -86,33 +88,51 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Status:"
-                        android:textSize="14sp"
-                        android:layout_marginEnd="8dp" />
-
-                    <Spinner
-                        android:id="@+id/spinnerFilterStatus"
+                    
+                    <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginEnd="8dp" />
+                        android:layout_marginEnd="8dp"
+                        android:hint="Filter by status"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnClearFilter"
-                        android:layout_width="wrap_content"
+                        <AutoCompleteTextView
+                            android:id="@+id/autoCompleteFilterStatus"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:focusable="false"
+                            android:clickable="true" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+                    
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="Clear"
-                        android:textSize="12sp"
-                        style="@style/Widget.Material3.Button.OutlinedButton" />
+                        android:layout_weight="1"
+                        android:hint="Filter by phone number"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etPhoneFilter"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="phone"
+                            android:maxLines="1" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnClearAll"
+                    android:layout_marginTop="2dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Clear All Messages"
+                    android:textSize="12sp"
+                    style="@style/Widget.Material3.Button.OutlinedButton" />
             </LinearLayout>
-
         </LinearLayout>
 
         <!-- Messages List -->

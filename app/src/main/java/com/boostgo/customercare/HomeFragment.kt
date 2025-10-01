@@ -1,18 +1,23 @@
 package com.boostgo.customercare
 
 import android.app.ActivityManager
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.boostgo.customercare.database.SmsMessage
 import com.boostgo.customercare.databinding.FragmentHomeBinding
 import com.boostgo.customercare.ui.MessageAdapter
 import com.boostgo.customercare.ui.MessageViewModel
@@ -49,7 +54,7 @@ class HomeFragment : Fragment() {
 
     private fun setupRecyclerView() {
         messageAdapter = MessageAdapter { message ->
-            // Handle message click if needed
+            showMessageDialog(message)
         }
 
         binding.recyclerViewMessages.apply {
@@ -80,10 +85,26 @@ class HomeFragment : Fragment() {
             }
         }
 
-        binding.btnClearFilter.setOnClickListener {
-            viewModel.clearFilter()
-            binding.spinnerFilterStatus.setSelection(0) // Reset to "All"
+        viewModel.loadDeliveredMessages()
+
+        viewModel.deliveredMessages.observe(viewLifecycleOwner) { messages ->
+            messageAdapter.submitList(messages)
         }
+
+        binding.btnClearAll.setOnClickListener {
+            viewModel.clearAllMessages()
+            binding.autoCompleteFilterStatus.setText("All", false) // Reset to "All"
+            binding.etPhoneFilter.text?.clear() // Clear phone filter
+        }
+        
+        // Setup phone number filter
+        binding.etPhoneFilter.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                viewModel.filterByPhoneNumber(s?.toString())
+            }
+        })
     }
 
     private fun checkPermissions() {
@@ -197,31 +218,42 @@ class HomeFragment : Fragment() {
         // Get available statuses from ViewModel
         val statuses = viewModel.getAvailableStatuses()
 
-        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, statuses)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.spinnerFilterStatus.adapter = adapter
+        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, statuses)
+        binding.autoCompleteFilterStatus.setAdapter(adapter)
+        
+        // Set default selection to "All"
+        binding.autoCompleteFilterStatus.setText("All", false)
 
-        // Set up spinner selection listener
-        binding.spinnerFilterStatus.onItemSelectedListener =
-            object : android.widget.AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(
-                    parent: android.widget.AdapterView<*>?,
-                    view: android.view.View?,
-                    position: Int,
-                    id: Long
-                ) {
-                    val selectedStatus = statuses[position]
-                    if (selectedStatus == "All") {
-                        viewModel.filterByStatus(null)
-                    } else {
-                        viewModel.filterByStatus(selectedStatus)
-                    }
-                }
-
-                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {
-                    // Do nothing
-                }
+        // Set up AutoCompleteTextView selection listener
+        binding.autoCompleteFilterStatus.setOnItemClickListener { _, _, position, _ ->
+            val selectedStatus = statuses[position]
+            if (selectedStatus == "All") {
+                viewModel.filterByStatus(null)
+            } else {
+                viewModel.filterByStatus(selectedStatus)
             }
+        }
+    }
+
+    private fun showMessageDialog(message: SmsMessage) {
+        val dialogBuilder = AlertDialog.Builder(requireContext())
+        dialogBuilder.setTitle("Message Details")
+        
+        val messageContent = """
+Phone: ${message.phoneNumber}
+Status: ${message.status}
+Time: ${java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(message.timestamp))}
+            
+Message:
+${message.message}
+        """.trimIndent()
+        
+        dialogBuilder.setMessage(messageContent)
+        dialogBuilder.setPositiveButton("OK") { dialog, _ ->
+            dialog.dismiss()
+        }
+        
+        dialogBuilder.create().show()
     }
 
     override fun onDestroyView() {
