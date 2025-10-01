@@ -5,12 +5,17 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.boostgo.customercare.database.SmsMessage
-import com.boostgo.customercare.database.SmsMessageDao
+import com.boostgo.customercare.repo.SmsMessageInterface
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class MessageViewModel : ViewModel() {
 
-    private lateinit var smsMessageDao: SmsMessageDao
+@HiltViewModel
+class MessageViewModel @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+@Inject constructor(private val smsMessageRepo: SmsMessageInterface) : ViewModel() {
 
     private val _allMessages = MutableLiveData<List<SmsMessage>>()
     private val _deliveredMessages = MutableLiveData<List<SmsMessage>>()
@@ -18,14 +23,13 @@ class MessageViewModel : ViewModel() {
 
     private var currentFilter: String? = null
 
-    fun init(dao: SmsMessageDao) {
-        smsMessageDao = dao
+    fun init() {
         loadDeliveredMessages()
     }
 
     private fun loadDeliveredMessages() {
         viewModelScope.launch {
-            smsMessageDao.getAllMessages().collect { messages ->
+            smsMessageRepo.getAllMessages().collect { messages ->
                 _allMessages.value = messages
                 applyFilter()
             }
@@ -44,17 +48,7 @@ class MessageViewModel : ViewModel() {
 
     fun clearAllMessages() {
         viewModelScope.launch {
-            smsMessageDao.deleteAllMessages()
-        }
-    }
-
-    fun updateMessageStatus(message: SmsMessage, status: String) {
-        viewModelScope.launch {
-            val updatedMessage = message.copy(
-                status = status,
-                deliveredAt = if (status == "Delivered") System.currentTimeMillis() else null
-            )
-            smsMessageDao.updateMessage(updatedMessage)
+            smsMessageRepo.deleteAllMessages()
         }
     }
 

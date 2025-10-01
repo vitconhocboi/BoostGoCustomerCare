@@ -1,38 +1,54 @@
 package com.boostgo.customercare.network
 
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import okhttp3.Interceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
+import javax.inject.Singleton
+import android.util.Log
 
+
+@Module
+@InstallIn(SingletonComponent::class)
 object RetrofitClient {
-    private const val BASE_URL = "https://your-api-base-url.com/" // Replace with actual API base URL
-    
-    // Toggle this to use mock data when API is not live
-    private const val USE_MOCK_API = true // Set to false when your API is live
-    
-    private val retrofit: Retrofit by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-    
-    private val mockApiService = MockApiService()
-    
-    val apiService: ApiService by lazy {
-        if (USE_MOCK_API) {
-            mockApiService
-        } else {
-            retrofit.create(ApiService::class.java)
+    private const val BASE_URL =
+        "http://185.193.157.43:1088/" // Replace with actual API base URL
+
+    @Provides
+    @Singleton
+    fun provideApiService(): ApiService {
+        // Create logging interceptor for debugging
+        val loggingInterceptor = HttpLoggingInterceptor { message ->
+            when {
+                message.startsWith("-->") -> Log.d("RetrofitClient", "🚀 REQUEST: $message")
+                message.startsWith("<--") -> Log.d("RetrofitClient", "📥 RESPONSE: $message")
+                message.startsWith("|") -> Log.d("RetrofitClient", "📄 BODY: $message")
+                else -> Log.d("RetrofitClient", "📋 INFO: $message")
+            }
+        }.apply {
+            level = HttpLoggingInterceptor.Level.BODY
         }
+
+        val clientBuilder = OkHttpClient
+            .Builder()
+            .addInterceptor(loggingInterceptor)
+
+        clientBuilder
+            .connectTimeout(5, TimeUnit.MINUTES)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(false)
+
+        Log.d("RetrofitClient", "Creating API service with base URL: $BASE_URL")
+        val retrofit = Retrofit.Builder().baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create()).client(clientBuilder.build())
+            .build()
+        return retrofit.create(ApiService::class.java)
     }
-    
-    /**
-     * Check if currently using mock API
-     */
-    fun isUsingMockApi(): Boolean = USE_MOCK_API
-    
-    /**
-     * Get mock service for testing purposes
-     */
-    fun getMockService(): MockApiService = mockApiService
 }

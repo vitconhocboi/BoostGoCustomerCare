@@ -18,8 +18,17 @@ data class SmsOrder(
     @SerializedName("order_time")
     val orderTime: String,
     
+    @SerializedName("quantity")
+    val quantity: Int,
+    
+    @SerializedName("cod")
+    val cod: Int,
+    
     @SerializedName("description")
-    val description: String
+    val description: String,
+    
+    @SerializedName("status")
+    val status: Int
 )
 
 data class SmsOrderRequest(
@@ -28,9 +37,7 @@ data class SmsOrderRequest(
 )
 
 data class SmsOrderResponse(
-    val success: Boolean,
-    val data: List<SmsOrder>?,
-    val message: String?
+    val result: SmsOrder?
 )
 
 data class UpdateOrderSmsRequest(
