@@ -31,6 +31,7 @@ class MessageAdapter(
         private val tvMessage: TextView = itemView.findViewById(R.id.tvMessage)
         private val tvStatus: TextView = itemView.findViewById(R.id.tvStatus)
         private val tvTimestamp: TextView = itemView.findViewById(R.id.tvTimestamp)
+        private val btnDetail: TextView = itemView.findViewById(R.id.btnDetail)
         
         fun bind(message: SmsMessage) {
             tvPhoneNumber.text = message.phoneNumber
@@ -56,9 +57,14 @@ class MessageAdapter(
                 }
             }
             
-            itemView.setOnClickListener {
+            // Detail TextView opens message details
+            btnDetail.setOnClickListener {
                 onMessageClick(message)
             }
+            
+            // Make the Detail TextView look clickable
+            btnDetail.isClickable = true
+            btnDetail.isFocusable = true
         }
     }
     

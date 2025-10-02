@@ -106,12 +106,7 @@ class HomeFragment : Fragment() {
         }
 
         binding.btnClearAll.setOnClickListener {
-            viewModel.clearAllMessages()
-            binding.autoCompleteFilterStatus.setText("Sending", false) // Reset to "Sending"
-            binding.etPhoneFilter.text?.clear() // Clear phone filter
-            viewModel.filterByStatus("Sending") // Apply the default filter
-            previousMessageCount = 0 // Reset message count
-            updateMessageCount(0) // Update count display
+            showClearAllConfirmDialog()
         }
         
         // Setup phone number filter
@@ -260,6 +255,29 @@ class HomeFragment : Fragment() {
     private fun updateMessageCount(count: Int) {
         val countText = if (count == 1) "1 message" else "$count messages"
         binding.tvMessageCount.text = countText
+    }
+
+    private fun showClearAllConfirmDialog() {
+        val dialogBuilder = AlertDialog.Builder(requireContext())
+        dialogBuilder.setTitle("Xóa tất cả tin nhắn")
+        dialogBuilder.setMessage("Bạn có chắc chắn muốn xóa tất cả tin nhắn không? Hành động này không thể hoàn tác.")
+        
+        dialogBuilder.setPositiveButton("Clear All") { dialog, _ ->
+            // User confirmed, proceed with clearing
+            viewModel.clearAllMessages()
+            binding.autoCompleteFilterStatus.setText("Sending", false) // Reset to "Sending"
+            binding.etPhoneFilter.text?.clear() // Clear phone filter
+            viewModel.filterByStatus("Sending") // Apply the default filter
+            previousMessageCount = 0 // Reset message count
+            updateMessageCount(0) // Update count display
+            dialog.dismiss()
+        }
+        
+        dialogBuilder.setNegativeButton("Cancel") { dialog, _ ->
+            dialog.dismiss()
+        }
+        
+        dialogBuilder.create().show()
     }
 
     private fun showMessageDialog(message: SmsMessage) {
