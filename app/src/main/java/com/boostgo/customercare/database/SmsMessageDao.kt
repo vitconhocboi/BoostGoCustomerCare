@@ -14,8 +14,11 @@ interface SmsMessageDao {
     @Query("SELECT * FROM sms_messages WHERE phoneNumber = :phoneNumber ORDER BY timestamp DESC")
     fun getMessagesByPhone(phoneNumber: String): Flow<List<SmsMessage>>
 
+    @Query("SELECT * FROM sms_messages WHERE id = :messageId")
+    suspend fun getMessageById(messageId: Long): SmsMessage?
+
     @Insert
-    suspend fun insertMessage(message: SmsMessage)
+    suspend fun insertMessage(message: SmsMessage): Long
 
     @Update
     suspend fun updateMessage(message: SmsMessage)

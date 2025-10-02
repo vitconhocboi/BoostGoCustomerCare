@@ -16,6 +16,8 @@ data class SmsMessage(
     val message: String,
     @ColumnInfo(name = "status")
     val status: String, // "Sending", "Sent", "Delivered", "Failed"
+    @ColumnInfo(name = "orderId")
+    val orderId: String,
     @ColumnInfo(name = "timestamp")
     val timestamp: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "deliveredAt")

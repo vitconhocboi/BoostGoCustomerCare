@@ -36,19 +36,21 @@ class MessageViewModel @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::cla
     private fun applyFilter() {
         val allMessages = _allMessages.value ?: emptyList()
         var filteredMessages = allMessages
-        
+
         // Apply status filter
-        if (currentFilter != null && currentFilter != "All") {
+        if(currentFilter == "Sending") {
+            filteredMessages = filteredMessages.filter { it.status == "Sending" || it.status == "Sent" }
+        }else if (currentFilter != null && currentFilter != "All") {
             filteredMessages = filteredMessages.filter { it.status == currentFilter }
         }
-        
+
         // Apply phone number filter
         if (!currentPhoneFilter.isNullOrBlank()) {
-            filteredMessages = filteredMessages.filter { 
-                it.phoneNumber.startsWith(currentPhoneFilter!!, ignoreCase = true) 
+            filteredMessages = filteredMessages.filter {
+                it.phoneNumber.startsWith(currentPhoneFilter!!, ignoreCase = true)
             }
         }
-        
+
         _deliveredMessages.value = filteredMessages
     }
 
@@ -68,7 +70,7 @@ class MessageViewModel @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::cla
         currentPhoneFilter = null
         applyFilter()
     }
-    
+
     fun filterByPhoneNumber(phoneNumber: String?) {
         currentPhoneFilter = phoneNumber?.trim()?.takeIf { it.isNotBlank() }
         applyFilter()

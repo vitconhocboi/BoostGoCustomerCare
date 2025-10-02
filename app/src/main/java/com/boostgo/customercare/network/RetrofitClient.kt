@@ -18,7 +18,7 @@ import android.util.Log
 @InstallIn(SingletonComponent::class)
 object RetrofitClient {
     private const val BASE_URL =
-        "http://185.193.157.43:1088/" // Replace with actual API base URL
+        "https://sales.bmctech.one/" // Replace with actual API base URL
 
     @Provides
     @Singleton

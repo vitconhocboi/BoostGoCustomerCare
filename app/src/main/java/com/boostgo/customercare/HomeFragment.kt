@@ -32,6 +32,7 @@ class HomeFragment : Fragment() {
 
     private lateinit var messageAdapter: MessageAdapter
     private val viewModel: MessageViewModel by viewModels()
+    private var previousMessageCount = 0
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -88,13 +89,29 @@ class HomeFragment : Fragment() {
         viewModel.loadDeliveredMessages()
 
         viewModel.deliveredMessages.observe(viewLifecycleOwner) { messages ->
-            messageAdapter.submitList(messages)
+            val currentMessageCount = messages.size
+            val hasNewMessages = currentMessageCount > previousMessageCount
+            
+            messageAdapter.submitList(messages) {
+                // Auto-scroll to top when new messages arrive
+                if (hasNewMessages && currentMessageCount > 0) {
+                    binding.recyclerViewMessages.smoothScrollToPosition(0)
+                }
+            }
+            
+            // Update message count display
+            updateMessageCount(currentMessageCount)
+            
+            previousMessageCount = currentMessageCount
         }
 
         binding.btnClearAll.setOnClickListener {
             viewModel.clearAllMessages()
-            binding.autoCompleteFilterStatus.setText("All", false) // Reset to "All"
+            binding.autoCompleteFilterStatus.setText("Sending", false) // Reset to "Sending"
             binding.etPhoneFilter.text?.clear() // Clear phone filter
+            viewModel.filterByStatus("Sending") // Apply the default filter
+            previousMessageCount = 0 // Reset message count
+            updateMessageCount(0) // Update count display
         }
         
         // Setup phone number filter
@@ -162,6 +179,9 @@ class HomeFragment : Fragment() {
         binding.tvServiceStatus.postDelayed({
             updateServiceStatus()
         }, 1000)
+        
+        // Auto-scroll to top when service starts to show new messages
+        binding.recyclerViewMessages.smoothScrollToPosition(0)
     }
 
     private fun stopSmsService() {
@@ -221,8 +241,10 @@ class HomeFragment : Fragment() {
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, statuses)
         binding.autoCompleteFilterStatus.setAdapter(adapter)
         
-        // Set default selection to "All"
-        binding.autoCompleteFilterStatus.setText("All", false)
+        // Set default selection to "Sending"
+        binding.autoCompleteFilterStatus.setText("Sending", false)
+        // Apply the default filter
+        viewModel.filterByStatus("Sending")
 
         // Set up AutoCompleteTextView selection listener
         binding.autoCompleteFilterStatus.setOnItemClickListener { _, _, position, _ ->
@@ -235,12 +257,18 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private fun updateMessageCount(count: Int) {
+        val countText = if (count == 1) "1 message" else "$count messages"
+        binding.tvMessageCount.text = countText
+    }
+
     private fun showMessageDialog(message: SmsMessage) {
         val dialogBuilder = AlertDialog.Builder(requireContext())
         dialogBuilder.setTitle("Message Details")
         
         val messageContent = """
 Phone: ${message.phoneNumber}
+Order ID: ${message.orderId}
 Status: ${message.status}
 Time: ${java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(message.timestamp))}
             

@@ -48,19 +48,7 @@
             android:foregroundServiceType="dataSync" />
 
         <receiver
-            android:name=".SentReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="SMS_SENT" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".DeliveredReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="SMS_DELIVERED" />
-            </intent-filter>
+            android:name=".SmsResultReceiver">
         </receiver>
     </application>
 

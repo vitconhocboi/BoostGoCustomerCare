@@ -6,6 +6,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
 import android.telephony.SmsManager
@@ -31,10 +33,10 @@ class SmsService : Service() {
 
     @Inject
     lateinit var settingConfigRepo: SettingConfigInterface
-    
+
     @Inject
     lateinit var smsMessageRepo: SmsMessageInterface
-    
+
     @Inject
     lateinit var apiService: ApiService
 
@@ -47,6 +49,9 @@ class SmsService : Service() {
         const val ACTION_STOP_POLLING = "STOP_POLLING"
         const val EXTRA_IMEI = "imei"
         const val TOKEN = "p8cdEszEHaoujFrZsFh405z7oAtHbA1g"
+        const val ACTION_SMS_SENT = "com.boostgo.customercare.action.SMS_SENT"
+        const val ACTION_SMS_DELIVERED = "com.boostgo.customercare.SMS_DELIVERED"
+        const val EXTRA_IS_LAST_PART = "com.boostgo.customercare.IS_LAST_PART"
     }
 
     private lateinit var notificationManager: NotificationManager
@@ -130,7 +135,8 @@ class SmsService : Service() {
                     Log.e("SmsService", "Error in polling: ${e.message}")
                 }
 
-                delay(5000) // Wait 5 seconds
+                val randomDelay = (60_000L..120_000L).random() // 1-2 minutes in milliseconds
+                delay(randomDelay)
             }
         }
     }
@@ -146,17 +152,17 @@ class SmsService : Service() {
         try {
             val testConfig = settingConfigRepo.getConfig().first()
             Log.d("SmsService", "fetchAndSendSms: $testConfig")
-            
+
             Log.d("SmsService", "API Request - getNewOrderSms: imei=$imei, token=$token")
             val response = apiService.getNewOrderSms(imei, token)
 
             if (response.isSuccessful) {
                 val order = response.body()?.result
                 Log.d("SmsService", "API Response Body: ${response.body()}")
-                
+
                 if (order != null) {
                     Log.d("SmsService", "Fetched new order: id=${order.orderId}, name=${order.name}, number=${order.number}, description=${order.description}, quantity=${order.quantity}, cod=${order.cod}, status=${order.status}")
-                    
+
                     val message = createSmsMessage(order)
                     val sendToNumber = if (testConfig?.isTestingEnabled == true) {
                         testConfig.testNumber
@@ -179,100 +185,104 @@ class SmsService : Service() {
     }
 
     private fun createSmsMessage(order: com.boostgo.customercare.model.SmsOrder): String {
-        return """
-            Chào A/C ${order.name} ạ!
-            Anh chị có đặt bên em ${order.description}. 
-            Số lượng: ${order.quantity} - COD: ${order.cod}đ
-            Shop đã tiếp nhận đơn hàng của A/C.
-            Shop sẽ gửi hàng cho A/C theo địa chỉ ${order.address}.
-            Hàng sẽ về từ 3 đến 5 ngày A/C để ý điện thoại nhận hàng giúp Shop ạ.
-            Cảm ơn A/C!
-        """.trimIndent()
+        return """Chào A/C ạ!
+Anh/chị có đặt bên em [${order.description}]. Shop đã tiếp nhận đơn hàng của A/C.
+Shop sẽ gửi hàng cho A/C theo địa chỉ [${order.address}].
+Hàng sẽ về từ 3 đến 5 ngày, A/C để ý điện thoại nhận hàng giúp Shop ạ.
+Nếu có vấn đề gì, A/C vui lòng liên hệ số điện thoại: 0973807248 để được hỗ trợ nhanh nhất.
+Cảm ơn A/C!""".trimIndent()
+    }
+
+    fun sendMessage(context: Context, address: String, body: String, messageId: Long) {
+        val smsManager = SmsManager.getDefault()
+        val parts = smsManager.divideMessage(body)
+        val partCount = parts.size
+
+        val send = arrayListOf<PendingIntent>()
+        val delivery = arrayListOf<PendingIntent?>()
+
+        for (partNumber in 1..partCount) {
+            val isLastPart = partNumber == partCount
+            send += PendingIntent.getBroadcast(
+                context,
+                partNumber,
+                createResultIntent(context, messageId)
+                    .setAction(ACTION_SMS_SENT)
+                    .putExtra(EXTRA_IS_LAST_PART, isLastPart),
+                RESULT_FLAGS
+            )
+            delivery += if (isLastPart) {
+                PendingIntent.getBroadcast(
+                    context,
+                    0,
+                    createResultIntent(context, messageId)
+                        .setAction(ACTION_SMS_DELIVERED),
+                    RESULT_FLAGS
+                )
+            } else null
+        }
+
+        smsManager.sendMultipartTextMessage(address, null, parts, send, delivery)
+    }
+
+    private fun createResultIntent(context: Context, messageId: Long) = Intent(
+        null,
+        Uri.fromParts("app", "com.boostgo.customercare", messageId.toString()),
+        context,
+        SmsResultReceiver::class.java
+    )
+
+    private val RESULT_FLAGS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_MUTABLE
+    } else {
+        PendingIntent.FLAG_ONE_SHOT
     }
 
     private fun sendSms(phoneNumber: String, message: String, orderId: String) {
-        try {
-            // Check SMS permission before sending
-            if (!PermissionHelper.hasSmsPermission(this)) {
-                Log.e("SmsService", "SMS permission not granted")
-                storeMessage(phoneNumber, message, "Failed - No SMS permission")
-                return
-            }
-
-            startForegroundService()
-
-            val smsManager = SmsManager.getDefault()
-
-            // Create PendingIntents for status tracking
-            val sentIntent = Intent("SMS_SENT")
-            val sentPI = PendingIntent.getBroadcast(
-                this, 0, sentIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            val deliveredIntent = Intent("SMS_DELIVERED")
-            val deliveredPI = PendingIntent.getBroadcast(
-                this, 0, deliveredIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            // Send SMS
-            if (message.length <= 160) {
-                smsManager.sendTextMessage(phoneNumber, null, message, sentPI, deliveredPI)
-            } else {
-                val parts = smsManager.divideMessage(message)
-                smsManager.sendMultipartTextMessage(phoneNumber, null, parts, arrayListOf(sentPI), arrayListOf(deliveredPI))
-            }
-
-            // Store message in database
-            storeMessage(phoneNumber, message, "Sending")
-
-            // Update order status to "sent"
-            updateOrderStatus(orderId, "3")
-
-            Log.i("SmsService", "SMS sent to $phoneNumber")
-
-        } catch (e: Exception) {
-            Log.e("SmsService", "Error sending SMS: ${e.message}")
-            storeMessage(phoneNumber, message, "Failed")
-        }
-    }
-
-    private fun storeMessage(phoneNumber: String, message: String, status: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val smsMessage = SmsMessage(
-                    phoneNumber = phoneNumber,
-                    message = message,
-                    status = status
-                )
-                smsMessageRepo.insertMessage(smsMessage)
-                Log.d("SmsService", "Message stored: $phoneNumber - $status")
-            } catch (e: Exception) {
-                Log.e("SmsService", "Error storing message: ${e.message}")
-            }
-        }
-    }
-
-    private fun updateOrderStatus(orderId: String, status: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val request = UpdateOrderSmsRequest(
-                    token = TOKEN,
-                    orderId = orderId,
-                    status = status
-                )
-
-                val response = apiService.updateOrderSms(request)
-
-                if (response.isSuccessful && response.body()?.success == true) {
-                    Log.d("SmsService", "Order $orderId updated to $status: ${response.body()?.message}")
-                } else {
-                    Log.e("SmsService", "Failed to update order $orderId: ${response.message()}")
+                // Check SMS permission before sending
+                if (!PermissionHelper.hasSmsPermission(this@SmsService)) {
+                    Log.e("SmsService", "SMS permission not granted")
+                    storeMessage(phoneNumber, message, "Failed - No SMS permission", orderId)
+                    return@launch
                 }
+
+                startForegroundService()
+
+                // Store message in database and get the message ID
+                val messageId = storeMessage(phoneNumber, message, "Sending", orderId)
+
+                if (messageId != -1L) {
+                    //send message with the stored message ID
+                    sendMessage(this@SmsService, phoneNumber, message,  messageId)
+                    // Update order status to "sent"
+                    Log.i("SmsService", "SMS sent to $phoneNumber with message ID: $messageId")
+                } else {
+                    Log.e("SmsService", "Failed to store message in database")
+                }
+
             } catch (e: Exception) {
-                Log.e("SmsService", "Error updating order status: ${e.message}")
+                Log.e("SmsService", "Error sending SMS: ${e.message}")
+                storeMessage(phoneNumber, message, "Failed", orderId)
             }
+        }
+    }
+
+    private suspend fun storeMessage(phoneNumber: String, message: String, status: String, orderId: String): Long {
+        return try {
+            val smsMessage = SmsMessage(
+                phoneNumber = phoneNumber,
+                message = message,
+                status = status,
+                orderId = orderId
+            )
+            val messageId = smsMessageRepo.insertMessage(smsMessage)
+            Log.d("SmsService", "Message stored: $phoneNumber - $status with ID: $messageId")
+            messageId
+        } catch (e: Exception) {
+            Log.e("SmsService", "Error storing message: ${e.message}")
+            -1L
         }
     }
 }

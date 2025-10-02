@@ -9,7 +9,7 @@ import android.content.Context
 
 @Database(
     entities = [SmsMessage::class, TestConfig::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class SmsDatabase : RoomDatabase() {
@@ -31,6 +31,14 @@ abstract class SmsDatabase : RoomDatabase() {
                 """)
             }
         }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    ALTER TABLE sms_messages ADD COLUMN orderId TEXT NOT NULL DEFAULT ''
+                """)
+            }
+        }
         
         fun getDatabase(context: Context): SmsDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -39,7 +47,7 @@ abstract class SmsDatabase : RoomDatabase() {
                     SmsDatabase::class.java,
                     "sms_database"
                 )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
                 INSTANCE = instance
                 instance

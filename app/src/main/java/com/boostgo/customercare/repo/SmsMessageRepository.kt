@@ -11,11 +11,19 @@ class SmsMessageRepository @Inject constructor(private val database: SmsDatabase
         database.smsMessageDao().deleteAllMessages()
     }
 
-    override suspend fun insertMessage(message: SmsMessage) {
-        database.smsMessageDao().insertMessage(message)
+    override suspend fun insertMessage(message: SmsMessage): Long {
+        return database.smsMessageDao().insertMessage(message)
+    }
+
+    override suspend fun updateMessage(message: SmsMessage) {
+        database.smsMessageDao().updateMessage(message)
     }
 
     override fun getAllMessages(): Flow<List<SmsMessage>> {
         return database.smsMessageDao().getAllMessages()
+    }
+
+    override suspend fun getMessageById(id: Long): SmsMessage? {
+        return database.smsMessageDao().getMessageById(id)
     }
 }
