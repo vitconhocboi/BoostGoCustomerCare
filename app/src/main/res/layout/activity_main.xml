@@ -7,48 +7,61 @@
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
-    <androidx.appcompat.widget.LinearLayoutCompat
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/homeActionBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/purple_500"
         android:gravity="bottom"
         android:paddingHorizontal="5dp"
-        android:paddingVertical="5dp"
+        android:paddingVertical="7dp"
         android:visibility="visible"
         app:layout_constraintTop_toTopOf="parent">
 
         <androidx.appcompat.widget.AppCompatTextView
-            android:layout_width="0dp"
+            android:id="@+id/bglogo"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:fontFamily="@font/teko"
-            android:maxLines="2"
+            android:maxLines="1"
+            app:autoSizeTextType="uniform"
             android:text="BoostGo"
-            android:textColor="@color/white"
-            android:textSize="28dp" />
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            android:textColor="#1AFA00"
+            android:textSize="40dp" />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/ivVipReady"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="2"
             android:autoSizeMinTextSize="12sp"
             android:autoSizeStepGranularity="2sp"
             android:autoSizeTextType="uniform"
+            android:layout_marginStart="5dp"
             android:gravity="bottom"
+            android:layout_marginTop="10dp"
+            android:fontFamily="@font/teko"
+            app:layout_constraintBottom_toBottomOf="@id/bglogo"
+            app:layout_constraintTop_toTopOf="parent"
             android:maxLines="1"
+            app:layout_constraintStart_toEndOf="@id/bglogo"
+            app:layout_constraintEnd_toStartOf="@id/lnSetting"
             android:text="Customer Care"
-            android:textColor="@color/white"
-            android:textSize="15dp" />
+            android:textColor="#FFF778"
+            android:textSize="20dp" />
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/lnSetting"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
+            app:layout_constraintBottom_toBottomOf="@id/bglogo"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             android:src="@drawable/ic_setting" />
-    </androidx.appcompat.widget.LinearLayoutCompat>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 
     <FrameLayout
