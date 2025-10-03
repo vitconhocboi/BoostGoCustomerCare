@@ -20,6 +20,11 @@ class RoomModule {
             context.applicationContext,
             SmsDatabase::class.java,
             "sms_database"
+        ).addMigrations(
+            SmsDatabase.Companion.MIGRATION_1_2,
+            SmsDatabase.Companion.MIGRATION_2_3,
+            SmsDatabase.Companion.MIGRATION_3_4,
+            SmsDatabase.Companion.MIGRATION_4_5
         ).build()
     }
 }

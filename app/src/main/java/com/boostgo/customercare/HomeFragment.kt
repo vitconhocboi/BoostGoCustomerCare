@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -123,6 +124,27 @@ class HomeFragment : Fragment() {
         if (!PermissionHelper.hasAllRequiredPermissions(requireContext())) {
             PermissionHelper.requestRequiredPermissions(requireActivity())
         }
+        
+        // Specifically check READ_SMS permission for reply message functionality
+        if (!PermissionHelper.hasReadSmsPermission(requireContext())) {
+            Log.w("HomeFragment", "READ_SMS permission not granted. SMS reply functionality will not work.")
+            Toast.makeText(
+                requireContext(),
+                "READ_SMS permission required for SMS reply functionality",
+                Toast.LENGTH_LONG
+            ).show()
+            PermissionHelper.requestReadSmsPermission(requireActivity())
+        }
+
+        if (!PermissionHelper.hasReceiveSmsPermission(requireContext())) {
+            Log.w("HomeFragment", "READ_SMS permission not granted. SMS reply functionality will not work.")
+            Toast.makeText(
+                requireContext(),
+                "READ_SMS permission required for SMS reply functionality",
+                Toast.LENGTH_LONG
+            ).show()
+            PermissionHelper.requestReceiveSmsPermission(requireActivity())
+        }
     }
 
     override fun onRequestPermissionsResult(
@@ -135,14 +157,25 @@ class HomeFragment : Fragment() {
         when (requestCode) {
             PermissionHelper.PERMISSION_REQUEST_CODE -> {
                 if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                    Toast.makeText(requireContext(), "Permissions granted!", Toast.LENGTH_SHORT)
+                    Toast.makeText(requireContext(), "All permissions granted! SMS service and reply functionality enabled.", Toast.LENGTH_SHORT)
                         .show()
                 } else {
-                    Toast.makeText(
-                        requireContext(),
-                        "Permissions denied. SMS service may not work properly.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    val deniedPermissions = PermissionHelper.getDeniedPermissions(requireContext())
+                    val hasReadSms = PermissionHelper.hasReadSmsPermission(requireContext())
+                    
+                    if (!hasReadSms) {
+                        Toast.makeText(
+                            requireContext(),
+                            "READ_SMS permission denied. SMS reply functionality will not work.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else {
+                        Toast.makeText(
+                            requireContext(),
+                            "Some permissions denied. SMS service may not work properly.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             }
         }

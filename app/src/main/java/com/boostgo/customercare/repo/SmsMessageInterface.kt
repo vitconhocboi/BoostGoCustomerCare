@@ -9,4 +9,5 @@ interface SmsMessageInterface {
     suspend fun updateMessage(message: SmsMessage)
     suspend fun deleteAllMessages()
     suspend fun getMessageById(id: Long): SmsMessage?
+    suspend fun getLatestMessageByPhone(phoneNumber: String): SmsMessage?
 }

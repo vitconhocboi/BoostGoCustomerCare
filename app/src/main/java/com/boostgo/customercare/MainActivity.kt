@@ -2,6 +2,7 @@ package com.boostgo.customercare
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
@@ -11,10 +12,10 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.whenResumed
 import com.boostgo.customercare.databinding.ActivityMainBinding
-import com.boostgo.customercare.databinding.FragmentHomeBinding
 import com.boostgo.customercare.ui.SettingsFragment
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {

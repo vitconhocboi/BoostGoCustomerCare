@@ -69,6 +69,8 @@ class SettingsFragment : Fragment() {
                         binding.etTestNumber.setText(currentConfig.testNumber)
                         binding.switchTestingEnabled.isChecked = currentConfig.isTestingEnabled
                         binding.etMessageTemplate.setText(currentConfig.messageTemplate)
+                        binding.etTelegramBotToken.setText(currentConfig.telegramBotToken)
+                        binding.etTelegramChatId.setText(currentConfig.telegramChatId)
                     }
                 }
             } catch (e: Exception) {
@@ -85,6 +87,8 @@ class SettingsFragment : Fragment() {
         val testNumber = binding.etTestNumber.text.toString().trim()
         val isTestingEnabled = binding.switchTestingEnabled.isChecked
         val messageTemplate = binding.etMessageTemplate.text.toString().trim()
+        val telegramBotToken = binding.etTelegramBotToken.text.toString().trim()
+        val telegramChatId = binding.etTelegramChatId.text.toString().trim()
 
         if (testNumber.isEmpty()) {
             binding.etTestNumber.error = "Test number is required"
@@ -100,7 +104,9 @@ class SettingsFragment : Fragment() {
             val testConfig = TestConfig(
                 testNumber = testNumber,
                 isTestingEnabled = isTestingEnabled,
-                messageTemplate = messageTemplate
+                messageTemplate = messageTemplate,
+                telegramBotToken = telegramBotToken,
+                telegramChatId = telegramChatId
             )
             viewLifecycleOwner.lifecycleScope.launch {
                 testConfigViewModel.saveTestConfig(testConfig)

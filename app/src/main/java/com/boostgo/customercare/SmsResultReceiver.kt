@@ -45,7 +45,7 @@ class SmsResultReceiver : BroadcastReceiver() {
                     Log.d("SmsResultReceiver", "SMS failed to send for message ID: $messageId, resultCode: $resultCode")
                     updateMessageStatus(context, messageId, "Failed")
                     // Play sound for failed message (only once per message)
-                    playFailureSoundOnce(context, messageId)
+//                    playFailureSoundOnce(context, messageId)
                 }
             }
             SmsService.Companion.ACTION_SMS_DELIVERED -> {
