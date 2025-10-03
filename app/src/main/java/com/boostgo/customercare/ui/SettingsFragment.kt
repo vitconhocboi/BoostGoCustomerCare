@@ -68,6 +68,7 @@ class SettingsFragment : Fragment() {
                     if (currentConfig != null) {
                         binding.etTestNumber.setText(currentConfig.testNumber)
                         binding.switchTestingEnabled.isChecked = currentConfig.isTestingEnabled
+                        binding.etMessageTemplate.setText(currentConfig.messageTemplate)
                     }
                 }
             } catch (e: Exception) {
@@ -83,16 +84,23 @@ class SettingsFragment : Fragment() {
     private fun saveSettings() {
         val testNumber = binding.etTestNumber.text.toString().trim()
         val isTestingEnabled = binding.switchTestingEnabled.isChecked
+        val messageTemplate = binding.etMessageTemplate.text.toString().trim()
 
         if (testNumber.isEmpty()) {
             binding.etTestNumber.error = "Test number is required"
             return
         }
 
+        if (messageTemplate.isEmpty()) {
+            binding.etMessageTemplate.error = "Message template is required"
+            return
+        }
+
         try {
             val testConfig = TestConfig(
                 testNumber = testNumber,
-                isTestingEnabled = isTestingEnabled
+                isTestingEnabled = isTestingEnabled,
+                messageTemplate = messageTemplate
             )
             viewLifecycleOwner.lifecycleScope.launch {
                 testConfigViewModel.saveTestConfig(testConfig)

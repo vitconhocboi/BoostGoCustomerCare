@@ -9,7 +9,7 @@ import android.content.Context
 
 @Database(
     entities = [SmsMessage::class, TestConfig::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class SmsDatabase : RoomDatabase() {
@@ -39,6 +39,18 @@ abstract class SmsDatabase : RoomDatabase() {
                 """)
             }
         }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    ALTER TABLE test_config ADD COLUMN message_template TEXT NOT NULL DEFAULT 'Cảm ơn A/C đã đặt hàng {description}.
+Shop đã tiếp nhận đơn hàng & gửi theo địa chỉ: {address}.
+Đơn hàng được gửi từ kho Bach Linh, dự kiến giao từ 3–5 ngày.
+A/C vui lòng để ý điện thoại giúp Shop ạ.
+Mọi thắc mắc LH: 0973807248'
+                """)
+            }
+        }
         
         fun getDatabase(context: Context): SmsDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -47,7 +59,7 @@ abstract class SmsDatabase : RoomDatabase() {
                     SmsDatabase::class.java,
                     "sms_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
                 INSTANCE = instance
                 instance

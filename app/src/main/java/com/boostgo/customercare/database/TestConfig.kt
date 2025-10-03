@@ -12,5 +12,7 @@ data class TestConfig(
     @ColumnInfo(name = "test_number")
     val testNumber: String,
     @ColumnInfo(name = "is_testing_enabled")
-    val isTestingEnabled: Boolean
+    val isTestingEnabled: Boolean,
+    @ColumnInfo(name = "message_template")
+    val messageTemplate: String
 )

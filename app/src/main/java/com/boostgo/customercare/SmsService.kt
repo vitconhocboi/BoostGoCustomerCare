@@ -184,13 +184,20 @@ class SmsService : Service() {
         }
     }
 
-    private fun createSmsMessage(order: com.boostgo.customercare.model.SmsOrder): String {
-        return """Chào A/C ạ!
-Anh/chị có đặt bên em [${order.description}]. Shop đã tiếp nhận đơn hàng của A/C.
-Shop sẽ gửi hàng cho A/C theo địa chỉ [${order.address}].
-Hàng sẽ về từ 3 đến 5 ngày, A/C để ý điện thoại nhận hàng giúp Shop ạ.
-Nếu có vấn đề gì, A/C vui lòng liên hệ số điện thoại: 0973807248 để được hỗ trợ nhanh nhất.
-Cảm ơn A/C!""".trimIndent()
+    private suspend fun createSmsMessage(order: com.boostgo.customercare.model.SmsOrder): String {
+        val config = settingConfigRepo.getConfig().first()
+        val template = config?.messageTemplate ?: """Cảm ơn A/C đã đặt hàng {description}.
+Shop đã tiếp nhận đơn hàng & gửi theo địa chỉ: {address}.
+Đơn hàng được gửi từ kho Bach Linh, dự kiến giao từ 3–5 ngày.
+A/C vui lòng để ý điện thoại giúp Shop ạ.
+Mọi thắc mắc LH: 0973807248"""
+        
+        return template
+            .replace("{description}", order.description)
+            .replace("{address}", order.address)
+            .replace("{name}", order.name)
+            .replace("{quantity}", order.quantity.toString())
+            .replace("{cod}", order.cod.toString())
     }
 
     fun sendMessage(context: Context, address: String, body: String, messageId: Long) {
