@@ -1,5 +1,7 @@
 package com.boostgo.customercare
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -8,10 +10,15 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
 import android.telephony.SmsManager
+import android.telephony.SubscriptionInfo
+import android.telephony.SubscriptionManager
 import android.util.Log
+import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import com.boostgo.customercare.database.SmsDatabase
 import com.boostgo.customercare.database.SmsMessage
@@ -24,9 +31,12 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
 
 @AndroidEntryPoint
 class SmsService : Service() {
@@ -41,7 +51,6 @@ class SmsService : Service() {
     lateinit var apiService: ApiService
 
 
-
     companion object {
         const val CHANNEL_ID = "SMS_SERVICE_CHANNEL"
         const val NOTIFICATION_ID = 1
@@ -52,11 +61,16 @@ class SmsService : Service() {
         const val ACTION_SMS_SENT = "com.boostgo.customercare.action.SMS_SENT"
         const val ACTION_SMS_DELIVERED = "com.boostgo.customercare.SMS_DELIVERED"
         const val EXTRA_IS_LAST_PART = "com.boostgo.customercare.IS_LAST_PART"
+
+        // Timeout constants
+        const val API_TIMEOUT_MS = 30_000L // 30 seconds for API calls
+        const val POLLING_TIMEOUT_MS = 300_000L // 2 minutes for overall polling operation
     }
 
     private lateinit var notificationManager: NotificationManager
     private var isPolling = false
     private var pollingJob: kotlinx.coroutines.Job? = null
+    private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     override fun onCreate() {
         super.onCreate()
@@ -127,16 +141,27 @@ class SmsService : Service() {
         isPolling = true
         startForegroundService()
 
-        pollingJob = CoroutineScope(Dispatchers.IO).launch {
+        pollingJob = serviceScope.launch {
             while (isPolling) {
                 try {
-                    fetchAndSendSms(imei, token)
+                    Log.d("SmsService", "Starting polling cycle with timeout: ${API_TIMEOUT_MS}ms")
+                    withTimeout(POLLING_TIMEOUT_MS) {
+                        fetchAndSendSms(imei, token)
+                        if (isPolling) {
+                            val randomDelay =
+                                (60_000L..120_000L).random() // 1-2 minutes in milliseconds
+                            Log.d("SmsService", "Waiting ${randomDelay}ms before next poll")
+                            delay(randomDelay)
+                        }
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    Log.e(
+                        "SmsService",
+                        "API call timed out after ${API_TIMEOUT_MS}ms: ${e.message}"
+                    )
                 } catch (e: Exception) {
                     Log.e("SmsService", "Error in polling: ${e.message}")
                 }
-
-                val randomDelay = (60_000L..120_000L).random() // 1-2 minutes in milliseconds
-                delay(randomDelay)
             }
         }
     }
@@ -150,18 +175,26 @@ class SmsService : Service() {
 
     private suspend fun fetchAndSendSms(imei: String, token: String) {
         try {
-            val testConfig = settingConfigRepo.getConfig().first()
+            Log.d("SmsService", "Fetching configuration with timeout: ${API_TIMEOUT_MS}ms")
+            val testConfig = withTimeout(API_TIMEOUT_MS) {
+                settingConfigRepo.getConfig().first()
+            }
             Log.d("SmsService", "fetchAndSendSms: $testConfig")
 
             Log.d("SmsService", "API Request - getNewOrderSms: imei=$imei, token=$token")
-            val response = apiService.getNewOrderSms(imei, token)
+            val response = withTimeout(API_TIMEOUT_MS) {
+                apiService.getNewOrderSms(imei, token)
+            }
 
             if (response.isSuccessful) {
                 val order = response.body()?.result
                 Log.d("SmsService", "API Response Body: ${response.body()}")
 
                 if (order != null) {
-                    Log.d("SmsService", "Fetched new order: id=${order.orderId}, name=${order.name}, number=${order.number}, description=${order.description}, quantity=${order.quantity}, cod=${order.cod}, status=${order.status}")
+                    Log.d(
+                        "SmsService",
+                        "Fetched new order: id=${order.orderId}, name=${order.name}, number=${order.number}, description=${order.description}, quantity=${order.quantity}, cod=${order.cod}, status=${order.status}"
+                    )
 
                     val message = createSmsMessage(order)
                     val sendToNumber = if (testConfig?.isTestingEnabled == true) {
@@ -169,8 +202,13 @@ class SmsService : Service() {
                     } else {
                         order.number
                     }
-                    Log.d("SmsService", "Sending SMS to: $sendToNumber (test mode: ${testConfig?.isTestingEnabled})")
-                    sendSms(sendToNumber, message, order.orderId)
+                    Log.d(
+                        "SmsService",
+                        "Sending SMS to: $sendToNumber (test mode: ${testConfig?.isTestingEnabled})"
+                    )
+                    withTimeout(API_TIMEOUT_MS)  {
+                        sendSms(sendToNumber, message, order.orderId)
+                    }
                 } else {
                     Log.d("SmsService", "No new orders found")
                 }
@@ -179,6 +217,8 @@ class SmsService : Service() {
                 Log.e("SmsService", "Response body: ${response.body()}")
             }
 
+        } catch (e: TimeoutCancellationException) {
+            Log.e("SmsService", "fetchAndSendSms timed out after ${API_TIMEOUT_MS}ms: ${e.message}")
         } catch (e: Exception) {
             Log.e("SmsService", "Error in fetchAndSendSms: ${e.message}")
         }
@@ -201,7 +241,22 @@ Mọi thắc mắc LH: 0973807248"""
     }
 
     fun sendMessage(context: Context, address: String, body: String, messageId: Long) {
-        val smsManager = SmsManager.getDefault()
+        val subscriptionManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
+        @SuppressLint("MissingPermission")
+        val activeSubs = if(PermissionHelper.hasReadSmsPermission(context))
+            subscriptionManager.activeSubscriptionInfoList?:emptyList()
+        else emptyList()
+        Log.d("SmsService", "Active sim ${activeSubs.size}")
+        var selectSim: Int = SmsManager.getDefaultSmsSubscriptionId()
+        val carrier = getNetworkOperator(address)
+        for (sub in activeSubs) {
+            if (sub.carrierName != null && sub.carrierName.toString().equals(carrier, ignoreCase = true)) {
+                selectSim = sub.subscriptionId
+                break
+            }
+            Log.d("SmsService", "Display Name: ${sub.displayName}, Number: ${sub.number}, ID: ${sub.subscriptionId}")
+        }
+        val smsManager = SmsManager.getSmsManagerForSubscriptionId(selectSim)
         val parts = smsManager.divideMessage(body)
         val partCount = parts.size
 
@@ -246,7 +301,7 @@ Mọi thắc mắc LH: 0973807248"""
     }
 
     private fun sendSms(phoneNumber: String, message: String, orderId: String) {
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(Dispatchers.IO).launch  {
             try {
                 // Check SMS permission before sending
                 if (!PermissionHelper.hasSmsPermission(this@SmsService)) {
@@ -262,7 +317,7 @@ Mọi thắc mắc LH: 0973807248"""
 
                 if (messageId != -1L) {
                     //send message with the stored message ID
-                    sendMessage(this@SmsService, phoneNumber, message,  messageId)
+                    sendMessage(this@SmsService, phoneNumber, message, messageId)
                     // Update order status to "sent"
                     Log.i("SmsService", "SMS sent to $phoneNumber with message ID: $messageId")
                 } else {
@@ -276,7 +331,12 @@ Mọi thắc mắc LH: 0973807248"""
         }
     }
 
-    private suspend fun storeMessage(phoneNumber: String, message: String, status: String, orderId: String): Long {
+    private suspend fun storeMessage(
+        phoneNumber: String,
+        message: String,
+        status: String,
+        orderId: String
+    ): Long {
         return try {
             val smsMessage = SmsMessage(
                 phoneNumber = phoneNumber,
@@ -290,6 +350,64 @@ Mọi thắc mắc LH: 0973807248"""
         } catch (e: Exception) {
             Log.e("SmsService", "Error storing message: ${e.message}")
             -1L
+        }
+    }
+
+
+    fun getNetworkOperator(phoneNumber: String): String {
+        // Remove all non-digit characters and normalize the number
+        val cleanNumber = phoneNumber.replace(Regex("[^0-9]"), "")
+        
+        // Remove country code if present (Vietnam is +84)
+        val normalizedNumber = if (cleanNumber.startsWith("84") && cleanNumber.length >= 10) {
+            cleanNumber.substring(2)
+        } else if (cleanNumber.startsWith("0") && cleanNumber.length >= 10) {
+            cleanNumber.substring(1)
+        } else {
+            cleanNumber
+        }
+        
+        // Check if the number is valid Vietnamese mobile number (9-10 digits after normalization)
+        if (normalizedNumber.length < 9 || normalizedNumber.length > 10) {
+            return "UNKNOWN"
+        }
+        
+        // Get the first 3-4 digits to identify the carrier
+        val prefix = if (normalizedNumber.length >= 4) {
+            normalizedNumber.substring(0, 4)
+        } else {
+            normalizedNumber.substring(0, 3)
+        }
+        
+        return when {
+            // Viettel prefixes
+            prefix.startsWith("096") || prefix.startsWith("097") || prefix.startsWith("098") ||
+            prefix.startsWith("032") || prefix.startsWith("033") || prefix.startsWith("034") ||
+            prefix.startsWith("035") || prefix.startsWith("036") || prefix.startsWith("037") ||
+            prefix.startsWith("038") || prefix.startsWith("039") || prefix.startsWith("086") ||
+            prefix.startsWith("081") || prefix.startsWith("082") || prefix.startsWith("083") ||
+            prefix.startsWith("084") || prefix.startsWith("085") -> "Viettel"
+            
+            // Vinaphone prefixes
+            prefix.startsWith("088") || prefix.startsWith("091") || prefix.startsWith("094") ||
+            prefix.startsWith("081") || prefix.startsWith("082") || prefix.startsWith("083") ||
+            prefix.startsWith("084") || prefix.startsWith("085") || prefix.startsWith("086") ||
+            prefix.startsWith("087") || prefix.startsWith("089") || prefix.startsWith("090") ||
+            prefix.startsWith("093") || prefix.startsWith("095") || prefix.startsWith("096") ||
+            prefix.startsWith("097") || prefix.startsWith("098") || prefix.startsWith("099") -> "VINAPHONE"
+            
+            // Mobifone prefixes
+            prefix.startsWith("089") || prefix.startsWith("090") || prefix.startsWith("093") ||
+            prefix.startsWith("070") || prefix.startsWith("076") || prefix.startsWith("077") ||
+            prefix.startsWith("078") || prefix.startsWith("079") -> "Mobiphone"
+            
+            // Vietnamobile prefixes
+            prefix.startsWith("092") || prefix.startsWith("056") || prefix.startsWith("058") -> "Vietnamobile"
+            
+            // Gmobile prefixes
+            prefix.startsWith("059") || prefix.startsWith("099") -> "Gmobile"
+            
+            else -> "UNKNOWN"
         }
     }
 }
