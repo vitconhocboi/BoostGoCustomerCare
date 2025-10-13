@@ -137,13 +137,24 @@ class HomeFragment : Fragment() {
         }
 
         if (!PermissionHelper.hasReceiveSmsPermission(requireContext())) {
-            Log.w("HomeFragment", "READ_SMS permission not granted. SMS reply functionality will not work.")
+            Log.w("HomeFragment", "RECEIVE_SMS permission not granted. SMS reply functionality will not work.")
             Toast.makeText(
                 requireContext(),
-                "READ_SMS permission required for SMS reply functionality",
+                "RECEIVE_SMS permission required for SMS reply functionality",
                 Toast.LENGTH_LONG
             ).show()
             PermissionHelper.requestReceiveSmsPermission(requireActivity())
+        }
+        
+        // Check phone call permission for SMS service functionality
+        if (!PermissionHelper.hasCallPhonePermission(requireContext())) {
+            Log.w("HomeFragment", "CALL_PHONE permission not granted. SMS service may not work properly.")
+            Toast.makeText(
+                requireContext(),
+                "CALL_PHONE permission required for SMS service functionality",
+                Toast.LENGTH_LONG
+            ).show()
+            PermissionHelper.requestCallPhonePermission(requireActivity())
         }
     }
 
@@ -162,11 +173,18 @@ class HomeFragment : Fragment() {
                 } else {
                     val deniedPermissions = PermissionHelper.getDeniedPermissions(requireContext())
                     val hasReadSms = PermissionHelper.hasReadSmsPermission(requireContext())
+                    val hasCallPhone = PermissionHelper.hasCallPhonePermission(requireContext())
                     
                     if (!hasReadSms) {
                         Toast.makeText(
                             requireContext(),
                             "READ_SMS permission denied. SMS reply functionality will not work.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else if (!hasCallPhone) {
+                        Toast.makeText(
+                            requireContext(),
+                            "CALL_PHONE permission denied. SMS service may not work properly.",
                             Toast.LENGTH_LONG
                         ).show()
                     } else {
@@ -189,6 +207,16 @@ class HomeFragment : Fragment() {
                 Toast.LENGTH_LONG
             ).show()
             PermissionHelper.requestRequiredPermissions(requireActivity())
+            return
+        }
+        
+        if (!PermissionHelper.hasCallPhonePermission(requireContext())) {
+            Toast.makeText(
+                requireContext(),
+                "Phone call permission is required for SMS service",
+                Toast.LENGTH_LONG
+            ).show()
+            PermissionHelper.requestCallPhonePermission(requireActivity())
             return
         }
 

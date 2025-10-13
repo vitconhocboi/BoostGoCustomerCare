@@ -24,7 +24,8 @@ class RoomModule {
             SmsDatabase.Companion.MIGRATION_1_2,
             SmsDatabase.Companion.MIGRATION_2_3,
             SmsDatabase.Companion.MIGRATION_3_4,
-            SmsDatabase.Companion.MIGRATION_4_5
+            SmsDatabase.Companion.MIGRATION_4_5,
+            SmsDatabase.Companion.MIGRATION_5_6
         ).build()
     }
 }

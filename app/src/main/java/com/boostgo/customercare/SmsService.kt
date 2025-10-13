@@ -1,6 +1,5 @@
 package com.boostgo.customercare
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,33 +9,27 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.provider.Settings
 import android.telephony.SmsManager
-import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
 import android.util.Log
-import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
-import com.boostgo.customercare.database.SmsDatabase
 import com.boostgo.customercare.database.SmsMessage
-import com.boostgo.customercare.utils.PermissionHelper
+import com.boostgo.customercare.network.ApiService
 import com.boostgo.customercare.repo.SettingConfigInterface
 import com.boostgo.customercare.repo.SmsMessageInterface
-import com.boostgo.customercare.network.ApiService
-import com.boostgo.customercare.model.UpdateOrderSmsRequest
+import com.boostgo.customercare.utils.PermissionHelper
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class SmsService : Service() {
@@ -240,7 +233,7 @@ Mọi thắc mắc LH: 0973807248"""
             .replace("{cod}", order.cod.toString())
     }
 
-    fun sendMessage(context: Context, address: String, body: String, messageId: Long) {
+    fun sendMessage(context: Context, address: String, body: String, messageId: Long): Pair<Int, String?> {
         val subscriptionManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
         @SuppressLint("MissingPermission")
         val activeSubs = if(PermissionHelper.hasReadSmsPermission(context))
@@ -248,14 +241,29 @@ Mọi thắc mắc LH: 0973807248"""
         else emptyList()
         Log.d("SmsService", "Active sim ${activeSubs.size}")
         var selectSim: Int = SmsManager.getDefaultSmsSubscriptionId()
+        var sendPhoneNumber: String? = null
         val carrier = getNetworkOperator(address)
         for (sub in activeSubs) {
             if (sub.carrierName != null && sub.carrierName.toString().equals(carrier, ignoreCase = true)) {
                 selectSim = sub.subscriptionId
+                sendPhoneNumber = sub.number
                 break
             }
             Log.d("SmsService", "Display Name: ${sub.displayName}, Number: ${sub.number}, ID: ${sub.subscriptionId}")
         }
+        
+        // If no matching carrier found, get the phone number from the selected SIM
+        if (sendPhoneNumber == null) {
+            for (sub in activeSubs) {
+                if (sub.subscriptionId == selectSim) {
+                    sendPhoneNumber = sub.number
+                    break
+                }
+            }
+        }
+        
+        Log.d("SmsService", "Selected SIM ID: $selectSim, Send Phone: $sendPhoneNumber")
+        
         val smsManager = SmsManager.getSmsManagerForSubscriptionId(selectSim)
         val parts = smsManager.divideMessage(body)
         val partCount = parts.size
@@ -285,6 +293,7 @@ Mọi thắc mắc LH: 0973807248"""
         }
 
         smsManager.sendMultipartTextMessage(address, null, parts, send, delivery)
+        return Pair(selectSim, sendPhoneNumber)
     }
 
     private fun createResultIntent(context: Context, messageId: Long) = Intent(
@@ -312,14 +321,18 @@ Mọi thắc mắc LH: 0973807248"""
 
                 startForegroundService()
 
-                // Store message in database and get the message ID
+                // Store message in database and get the message ID (without SIM info initially)
                 val messageId = storeMessage(phoneNumber, message, "Sending", orderId)
 
                 if (messageId != -1L) {
-                    //send message with the stored message ID
-                    sendMessage(this@SmsService, phoneNumber, message, messageId)
+                    // Send message and get SIM information
+                    val (selectedSimId, sendPhoneNumber) = sendMessage(this@SmsService, phoneNumber, message, messageId)
+                    
+                    // Update the message with SIM information
+                    updateMessageWithSimInfo(messageId, selectedSimId, sendPhoneNumber)
+                    
                     // Update order status to "sent"
-                    Log.i("SmsService", "SMS sent to $phoneNumber with message ID: $messageId")
+                    Log.i("SmsService", "SMS sent to $phoneNumber with message ID: $messageId, SIM: $selectedSimId, Send Phone: $sendPhoneNumber")
                 } else {
                     Log.e("SmsService", "Failed to store message in database")
                 }
@@ -335,21 +348,41 @@ Mọi thắc mắc LH: 0973807248"""
         phoneNumber: String,
         message: String,
         status: String,
-        orderId: String
+        orderId: String,
+        selectedSimId: Int? = null,
+        sendPhoneNumber: String? = null
     ): Long {
         return try {
             val smsMessage = SmsMessage(
                 phoneNumber = phoneNumber,
                 message = message,
                 status = status,
-                orderId = orderId
+                orderId = orderId,
+                selectedSimId = selectedSimId,
+                sendPhoneNumber = sendPhoneNumber
             )
             val messageId = smsMessageRepo.insertMessage(smsMessage)
-            Log.d("SmsService", "Message stored: $phoneNumber - $status with ID: $messageId")
+            Log.d("SmsService", "Message stored: $phoneNumber - $status with ID: $messageId, SIM: $selectedSimId, Send Phone: $sendPhoneNumber")
             messageId
         } catch (e: Exception) {
             Log.e("SmsService", "Error storing message: ${e.message}")
             -1L
+        }
+    }
+    
+    private suspend fun updateMessageWithSimInfo(messageId: Long, selectedSimId: Int, sendPhoneNumber: String?) {
+        try {
+            val message = smsMessageRepo.getMessageById(messageId)
+            if (message != null) {
+                val updatedMessage = message.copy(
+                    selectedSimId = selectedSimId,
+                    sendPhoneNumber = sendPhoneNumber
+                )
+                smsMessageRepo.updateMessage(updatedMessage)
+                Log.d("SmsService", "Updated message $messageId with SIM info: $selectedSimId, $sendPhoneNumber")
+            }
+        } catch (e: Exception) {
+            Log.e("SmsService", "Error updating message with SIM info: ${e.message}")
         }
     }
 

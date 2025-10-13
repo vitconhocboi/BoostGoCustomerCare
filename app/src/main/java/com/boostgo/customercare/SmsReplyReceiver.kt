@@ -5,18 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
-import com.boostgo.customercare.repo.SmsMessageInterface
 import com.boostgo.customercare.repo.SettingConfigInterface
+import com.boostgo.customercare.repo.SmsMessageInterface
+import com.boostgo.customercare.utils.TelegramUtils
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
-import java.io.IOException
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
-import org.json.JSONObject
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -89,7 +85,8 @@ class SmsReplyReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val telegramMessage = buildOrderInfoMessage(message, replyMessage)
-                sendTelegramMessage(telegramMessage)
+                val config = settingConfigRepo.getConfig().first()
+                TelegramUtils.sendTelegramMessage(telegramMessage, config)
             } catch (e: Exception) {
                 Log.e("SmsReplyReceiver", "Error sending order info to Telegram: ${e.message}")
             }
@@ -100,7 +97,8 @@ class SmsReplyReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val telegramMessage = buildUnknownReplyMessage(phoneNumber, replyMessage)
-                sendTelegramMessage(telegramMessage)
+                val config = settingConfigRepo.getConfig().first()
+                TelegramUtils.sendTelegramMessage(telegramMessage, config)
             } catch (e: Exception) {
                 Log.e("SmsReplyReceiver", "Error sending unknown reply to Telegram: ${e.message}")
             }
@@ -145,71 +143,5 @@ class SmsReplyReceiver : BroadcastReceiver() {
             ).format(java.util.Date())
         }
         """.trimIndent()
-    }
-
-    private suspend fun sendTelegramMessage(message: String) {
-        try {
-            // Get Telegram configuration from database
-            val config = settingConfigRepo.getConfig().first()
-
-            if (config == null || config.telegramBotToken.isEmpty() || config.telegramChatId.isEmpty()) {
-                Log.w(
-                    "SmsReplyReceiver",
-                    "Telegram configuration not found or incomplete. Skipping Telegram notification."
-                )
-                Log.w(
-                    "SmsReplyReceiver",
-                    "Bot Token: ${config?.telegramBotToken?.isNotEmpty() == true}"
-                )
-                Log.w(
-                    "SmsReplyReceiver",
-                    "Chat ID: ${config?.telegramChatId?.isNotEmpty() == true}"
-                )
-                return
-            }
-
-            val telegramApiUrl = "https://api.telegram.org/bot${config.telegramBotToken}/sendMessage"
-            val url = URL(telegramApiUrl)
-            val connection = url.openConnection() as HttpURLConnection
-
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
-
-            // Create JSON payload
-            val jsonPayload = JSONObject().apply {
-                put("chat_id", config.telegramChatId)
-                put("parse_mode", "HTML")
-                put("text", message)
-            }
-
-            Log.e("SmsReplyReceiver", "Send to telegram $telegramApiUrl body: $jsonPayload")
-
-            // Send JSON data
-            connection.outputStream.use { outputStream ->
-                val writer = OutputStreamWriter(outputStream, "UTF-8")
-                writer.write(jsonPayload.toString())
-                writer.flush()
-            }
-
-            val responseCode = connection.responseCode
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                Log.d("SmsReplyReceiver", "Message sent to Telegram successfully")
-                Log.d("SmsReplyReceiver", "JSON payload: ${jsonPayload.toString()}")
-            } else {
-                Log.e(
-                    "SmsReplyReceiver",
-                    "Failed to send message to Telegram. Response code: $responseCode"
-                )
-                val errorResponse = connection.errorStream?.bufferedReader()?.readText()
-                Log.e("SmsReplyReceiver", "Error response: $errorResponse")
-            }
-
-            connection.disconnect()
-        } catch (e: IOException) {
-            Log.e("SmsReplyReceiver", "Network error sending to Telegram: ${e.message}")
-        } catch (e: Exception) {
-            Log.e("SmsReplyReceiver", "Error sending to Telegram: ${e.message}")
-        }
     }
 }

@@ -9,7 +9,7 @@ import android.content.Context
 
 @Database(
     entities = [SmsMessage::class, TestConfig::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class SmsDatabase : RoomDatabase() {
@@ -68,6 +68,21 @@ Mọi thắc mắc LH: 0973807248'
                 database.execSQL(
                     """
                     ALTER TABLE test_config ADD COLUMN telegram_chat_id TEXT NOT NULL DEFAULT ''
+                """
+                )
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    ALTER TABLE sms_messages ADD COLUMN selectedSimId INTEGER
+                """
+                )
+                database.execSQL(
+                    """
+                    ALTER TABLE sms_messages ADD COLUMN sendPhoneNumber TEXT
                 """
                 )
             }

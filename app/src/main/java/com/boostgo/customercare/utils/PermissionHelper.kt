@@ -18,7 +18,8 @@ object PermissionHelper {
         Manifest.permission.SEND_SMS,
         Manifest.permission.READ_PHONE_STATE,
         Manifest.permission.RECEIVE_SMS,
-        Manifest.permission.READ_SMS
+        Manifest.permission.READ_SMS,
+        Manifest.permission.CALL_PHONE
     )
     
     /**
@@ -71,6 +72,16 @@ object PermissionHelper {
     }
     
     /**
+     * Checks if CALL_PHONE permission is granted
+     */
+    fun hasCallPhonePermission(context: Context): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.CALL_PHONE
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+    
+    /**
      * Requests required permissions
      */
     fun requestRequiredPermissions(activity: Activity) {
@@ -117,6 +128,19 @@ object PermissionHelper {
             ActivityCompat.requestPermissions(
                 activity,
                 arrayOf(Manifest.permission.RECEIVE_SMS),
+                PERMISSION_REQUEST_CODE
+            )
+        }
+    }
+    
+    /**
+     * Requests CALL_PHONE permission specifically
+     */
+    fun requestCallPhonePermission(activity: Activity) {
+        if (!hasCallPhonePermission(activity)) {
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(Manifest.permission.CALL_PHONE),
                 PERMISSION_REQUEST_CODE
             )
         }

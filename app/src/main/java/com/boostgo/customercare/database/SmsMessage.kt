@@ -21,5 +21,9 @@ data class SmsMessage(
     @ColumnInfo(name = "timestamp")
     val timestamp: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "deliveredAt")
-    val deliveredAt: Long? = null
+    val deliveredAt: Long? = null,
+    @ColumnInfo(name = "selectedSimId")
+    val selectedSimId: Int? = null, // SIM subscription ID used for sending
+    @ColumnInfo(name = "sendPhoneNumber")
+    val sendPhoneNumber: String? = null // Phone number of the SIM used for sending
 )
